@@ -1,15 +1,11 @@
 const fs = require('fs');
-const { Client, Chat } = require('whatsapp-web.js');
+const { Client, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const csv = require('csv-parser')
 const results = [];
 const { format } = require('date-fns');
 
-
-// Path where the session data will be stored
 const SESSION_FILE_PATH = './session.json';
-
-// Load the session data if it has been previously saved
 let sessionData = false;
 if(fs.existsSync(SESSION_FILE_PATH)) {
     sessionData = require(SESSION_FILE_PATH);
@@ -20,9 +16,11 @@ const client = new Client({
 	session: sessionData
 });
 
+// Change this for matches.
+const MATCH_TYPE = 'SOLO'								// SOLO | DUO | SQUAD
+
 // Save session values to the file upon successful auth
 client.on('authenticated', (session) => {
-	console.log("session", session);
     sessionData = session;
     fs.writeFile(SESSION_FILE_PATH, JSON.stringify(session), function (err) {
         if (err) {
@@ -51,37 +49,51 @@ client.on('ready', () => {
 	  .pipe(csv())
 	  .on('data', (data) => {
 
-	  	let message = `Hello ${data['Name'] || data['In game Name']},\n\nMatch registration for your team (${data['Team Name']}) is confirmed with us! Please use the details below to join the match.\nSlot: #${data['Slot']}\nDate: ${data['Match Date'] ? data['Match Date'] : format(new Date(), 'do MMM, y')}\nTime: 9:00 PM IST\n\nSee ya on the grounds!
-	  	`
-	  	results.push(message);
-
-	  	if(i < 3) {
 	  		waitTime += Math.random()*10000;
 
+	  		let messages = {
+				SOLO: `Hello ${data['Name'] || data['In game Name']},\n\nMatch registration is confirmed with us! Please use the details below to join the match.\n\nSlot: #${data['Slot']}\nDate: ${data['Match Date'] ? data['Match Date'] : format(new Date(), 'do MMM, y')}\nTime: 9:00 PM IST\nRoom ID: \nPassword: \n\nPlease have a look at the seating arrangment See ya on the grounds!
+			  	`,
+			  	SQUAD: `Hello ${data['Name'] || data['In game Name']},\n\nMatch registration for your team (${data['Team Name']}) is confirmed with us! Please use the details below to join the match.\n\nSlot: #${data['Slot']}\nDate: ${data['Match Date'] ? data['Match Date'] : format(new Date(), 'do MMM, y')}\nTime: 9:00 PM IST\nRoom ID: \nPassword: \n\nPlease have a look at the seating arrangment See ya on the grounds!
+			  	`,
+			  	DUO: `Hello ${data['Name'] || data['In game Name']},\n\nMatch registration for your team (${data['Team Name']}) is confirmed with us! Please use the details below to join the match.\n\nSlot: #${data['Slot']}\nDate: ${data['Match Date'] ? data['Match Date'] : format(new Date(), 'do MMM, y')}\nTime: 9:00 PM IST\nRoom ID: \nPassword: \n\nPlease have a look at the seating arrangment See ya on the grounds!
+			  	`
+			}
+
 	  		setTimeout(function() {
-		  		// client.sendMessage('917389283733@c.us', message)
-		  		client.sendMessage('919981809668@c.us', message)
-					// .then((response)=>{
-				 //    	console.log("response", response);
-					// });
+
+			  	if(data['Contact']) {
+		  			// let recipient = '919981809668@c.us';
+
+			  		let recipient = '91'+data['Contact']+'@c.us';
+		  			client.sendMessage(recipient, messages[MATCH_TYPE]);
+			  		
+			  		let data = fs.readFileSync('arrangement.png');
+		  			if(data) {
+		  				let buff = new Buffer.from(data);
+
+		  				client.sendMessage(recipient, new MessageMedia('image/png', buff.toString('base64'), 'Slot arrangement'));
+		  			}
+
+			  	} else {
+		  			let recipient = '917389283733@c.us';
+		  			client.sendMessage(recipient, `Bruh, cannot send message to ${data['Name'] || data['In game Name']}, contact details not present!`);
+		  			client.sendMessage(recipient, `Send the below message manually!`);
+		  			client.sendMessage(recipient, messages[MATCH_TYPE]);
+		  			
+		  			let data = fs.readFileSync('arrangement.png');
+		  			if(data) {
+		  				let buff = new Buffer.from(data);
+
+		  				client.sendMessage(recipient, new MessageMedia('image/png', buff.toString('base64'), 'Slot arrangement'));
+		  			}
+
+			  	}
+
 	  		}, Math.ceil(waitTime))
-	  	}
 
 		i++;
 	  })
-	// for(let i = 0 ; i < 9 ; i++) {
-	// 	client.sendMessage('919981809668@c.us', 'Hi '+i)
-	// 		.then((response)=>{
-	// 	    // if(response.id.fromMe){
-	// 	    	console.log("response", response);
-
-	// 	    // }
-	// 	});
-	// }
-});
-
-client.on('message', msg => {
-	// console.log("msg", msg);
 });
 
 client.initialize();
